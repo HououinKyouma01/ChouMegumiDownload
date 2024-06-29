@@ -116,7 +116,7 @@ Mushoku Tensei S2|Mushoku Tensei|2
 Run the script with:
 
 ```bash
-python megumi_download.py
+python chou_megumi_download.py
 ```
 
 The application will:
