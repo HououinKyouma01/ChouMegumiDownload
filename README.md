@@ -1,4 +1,6 @@
-# Megumi Download
+# Chou Megumi Download
+
+It's a cross-platform version of a program previously written in C# called [Megumi_Download](https://github.com/HououinKyouma01/Megumi_Download) for Windows, which, in a nutshell, allowed downloading anime episodes from a seedbox, moving them to the appropriate folders, renaming the file (to a system recognized by Kodi's TVDB standard) and automatically replacing various things in the subtitles (order of names, honorifics, etc.). Admittedly, it could be run through Wine on macOS and Linux without any problems, but it had other issues. The most important change is that it has now been rewritten to Python and supports not only parallel downloading of multiple episodes, but also downloading using chunks. Both things speed up the whole process a lot. Everything is configurable. Also, because it is written in Python, it starts natively on any system with a Python interpreter installed. 
 
 
 ## Table of Contents
@@ -9,7 +11,6 @@
 - [Usage](#usage)
 - [Advanced Options](#advanced-options)
 - [Troubleshooting](#troubleshooting)
-- [Contributing](#contributing)
 
 ## Overview
 
@@ -17,9 +18,9 @@ Megumi Download is a powerful, customizable Python application designed to autom
 
 ## Features
 
-- 🚀 **Fast Downloads**: Utilizes chunked downloading for improved speed
-- 🗂️ **Automatic Organization**: Sorts episodes into series and season folders
-- 🔄 **SFTP Integration**: Connects to your seedbox or remote server
+- 🚀 **Fast Downloads**: Utilizes chunked and parallel downloading for improved speed
+- 🗂️ **Automatic Organization**: Sorts episodes into series and season folders using TVDB standard (maintly for Kodi/Plex)
+- 🔄 **SFTP Integration**: Connects to your seedbox or remote server and download episodes automatically
 - 🎞️ **Subtitle Processing**: Extracts, modifies, and remuxes subtitles
 - ⚙️ **Highly Configurable**: Customize nearly every aspect of the application
 - 🖥️ **Cross-Platform**: Works on Windows, macOS, and Linux
@@ -28,14 +29,8 @@ Megumi Download is a powerful, customizable Python application designed to autom
 
 1. **Clone the Repository**
    ```bash
-   git clone https://github.com/your-username/megumi-download.git
-   cd megumi-download
-   ```
-
-2. **Set Up a Virtual Environment (Optional but Recommended)**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+   git clone https://github.com/HououinKyouma01/ChouMegumiDownload.git
+   cd ChouMegumiDownload
    ```
 
 3. **Install Dependencies**
@@ -50,7 +45,7 @@ Megumi Download is a powerful, customizable Python application designed to autom
 
 ## Configuration
 
-Megumi Download uses three configuration files:
+Chou Megumi Download uses three configuration files:
 
 ### 1. `config.megumi`
 
@@ -80,7 +75,7 @@ BUFFER_SIZE=1048576
 - `SAVEINFO`: Set to "ON" to save original filenames
 - `CHUNKS`: Number of chunks for parallel downloading
 - `USE_CHUNKS`: Set to "ON" to enable chunked downloading
-- `BUFFER_SIZE`: Buffer size for chunk reading (in bytes)
+- `BUFFER_SIZE`: Buffer size for chunk reading (in bytes, can be left as it is)
 
 ### 2. `groups.megumi`
 
@@ -102,8 +97,18 @@ SubsPlease
 Configure your anime series with the format: `file_name|folder_name|season_number`
 
 ```
-Kimetsu no Yaiba|Demon Slayer|1
-Shingeki no Kyojin|Attack on Titan|4
+One Room, Hiatari Futsuu, Tenshi-tsuki|One Room, Hiatari Futsuu, Tenshi-tsuki|1
+Shuumatsu Train Doko e Iku|Shuumatsu Train Doko e Iku|1
+Kami wa Game ni Ueteiru|Kami wa Game ni Ueteiru|1
+Spice and Wolf (2024)|Ookami to Koushinryou (2024)|1
+Dainanaoji|Tensei shitara Dainana Ouji Datta node, Kimama ni Majutsu wo Kiwamemasu|1
+The Dangers in My Heart S2|Boku no Kokoro no Yabai Yatsu|2
+Yuru Camp S3|Yuru Camp|3
+Hananoi-kun to Koi no Yamai|Hananoi-kun to Koi no Yamai|1
+Jellyfish Can't Swim in the Night|Yoru no Kurage wa Oyogenai|1
+Hibike! Euphonium S3|Hibike! Euphonium|3
+Jiisan Baasan Wakagaeru|Jiisan Baasan Wakagaeru|1
+Mushoku Tensei S2|Mushoku Tensei|2
 ```
 
 ## Usage
@@ -230,3 +235,7 @@ Adjust `CHUNKS` and `BUFFER_SIZE` in `config.megumi` to optimize for your networ
 - **SFTP Connection Issues**: Double-check your `HOST`, `USER`, and `PASSWORD` in `config.megumi`
 - **Slow Downloads**: Try increasing `CHUNKS` or `BUFFER_SIZE`
 - **File Organization Problems**: Ensure your `serieslist.megumi` is correctly formatted
+- **MacOS pip command not found**: use
+  ```bash
+   python3 -m pip install paramiko tqdm
+   ```
