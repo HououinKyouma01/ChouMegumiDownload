@@ -1,6 +1,5 @@
 # Megumi Download
 
-![Megumi Download Logo](https://via.placeholder.com/150?text=Megumi+Download)
 
 ## Table of Contents
 - [Overview](#overview)
