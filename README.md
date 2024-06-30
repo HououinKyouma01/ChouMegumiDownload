@@ -62,7 +62,7 @@ MOVELOCAL=OFF
 RENAME=ON
 SAVEINFO=ON
 CHUNKS=4
-USE_CHUNKS=ON
+USE_CHUNKS=OFF
 BUFFER_SIZE=1048576
 ```
 
@@ -72,9 +72,9 @@ BUFFER_SIZE=1048576
 - `LOCALTEMP`: Temporary directory for downloads
 - `MOVELOCAL`: Set to "ON" to move local files instead of downloading
 - `RENAME`: Set to "ON" to rename files to a standard format
-- `SAVEINFO`: Set to "ON" to save original filenames
+- `SAVEINFO`: Set to "ON" to save original filenames into .info file
 - `CHUNKS`: Number of chunks for parallel downloading
-- `USE_CHUNKS`: Set to "ON" to enable chunked downloading
+- `USE_CHUNKS`: Set to "ON" to enable chunked downloading. OFF is recommended by now.
 - `BUFFER_SIZE`: Buffer size for chunk reading (in bytes, can be left as it is)
 
 ### 2. `groups.megumi`
