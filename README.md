@@ -10,9 +10,9 @@ It's a cross-platform version of a program previously written in C# called [Megu
 
 ---
 
-## 🌟 Features That'll Make Your Hear Go "DokiDoki!"
+## 🌟 Features That'll Make Your Heart Go "DokiDoki!"
 
-- 🎞️ **Subtitle Sorcery**: Extracts, tweaks, and remuxes subtitles like magic!
+- 🎞️ **Subtitle Sorcery**: Extracts, tweaks, and remuxes subtitles like magic! You can replace anything!
 - 🚄 **Shinkansen-Fast Downloads**: Parallel and chunked downloading for speed that'll make your head spin!
 - 🗂️ **Kodi-Friendly Organization**: Sorts episodes using the TVDB standard, perfect for Kodi and Plex!
 - 🔐 **SFTP Superpowers**: Connects to your seedbox faster than you can say "Nani?!"
@@ -83,7 +83,7 @@ SubsPlease
 
 ### 3. `serieslist.megumi`: Your Anime Catalog
 
-Format: `file_name|folder_name|season_number`
+Format: `title_in_file_name|series_folder_name|season_number`
 
 ```
 One Room, Hiatari Futsuu, Tenshi-tsuki|One Room, Hiatari Futsuu, Tenshi-tsuki|1
@@ -120,7 +120,7 @@ Sit back and watch as Chou Megumi Download:
 
 ---
 
-## 🛠️ Advanced Tweaks for Power Users
+## 🛠️ Tweak your subtitles
 
 ### Subtitle Replacement Magic
 
@@ -235,4 +235,4 @@ Adjust these in `config.megumi`:
 
 ---
 
-Now go forth and download anime and never be like those filty tourists! 🎌✨
+Now go forth and download anime and never be like those filthy tourists! 🎌✨
