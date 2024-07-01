@@ -124,7 +124,11 @@ Sit back and watch as Chou Megumi Download:
 
 ### Subtitle Replacement Magic
 
-Create a `replace.txt` in your series folder:
+Create a `replace.txt` in your series folder (for example `C:\Anime\Hibike! Euphonium\Season 3\replace.txt`) and fill it with everthing you want to replace using:
+
+`Old String|New String`
+
+Like in the provided example from Hibike! Euphonium below:
 
 ```
 Kato|Katou
