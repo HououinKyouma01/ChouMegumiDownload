@@ -1,63 +1,63 @@
-# Chou Megumi Download
+# 🌸 Chou Megumi Download 🌸
+
+![Python Version](https://img.shields.io/badge/python-3.7%2B-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
+
+## 🚀 Supercharge Your Anime Downloads!
 
 It's a cross-platform version of a program previously written in C# called [Megumi_Download](https://github.com/HououinKyouma01/Megumi_Download) for Windows, which, in a nutshell, allowed downloading anime episodes from a seedbox, moving them to the appropriate folders, renaming the file (to a system recognized by Kodi's TVDB standard) and automatically replacing various things in the subtitles (order of names, honorifics, etc.). Admittedly, it could be run through Wine on macOS and Linux without any problems, but it had other issues. The most important change is that it has now been rewritten to Python and supports not only parallel downloading of multiple episodes, but also downloading using chunks. Both things speed up the whole process a lot. Everything is configurable. Also, because it is written in Python, it starts natively on any system with a Python interpreter installed. 
 
+---
 
-## Table of Contents
-- [Overview](#overview)
-- [Features](#features)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [Advanced Options](#advanced-options)
-- [Troubleshooting](#troubleshooting)
+## 🌟 Features That'll Make Your Hear Go "DokiDoki!"
 
-## Overview
+- 🎞️ **Subtitle Sorcery**: Extracts, tweaks, and remuxes subtitles like magic!
+- 🚄 **Shinkansen-Fast Downloads**: Parallel and chunked downloading for speed that'll make your head spin!
+- 🗂️ **Kodi-Friendly Organization**: Sorts episodes using the TVDB standard, perfect for Kodi and Plex!
+- 🔐 **SFTP Superpowers**: Connects to your seedbox faster than you can say "Nani?!"
+- ⚙️ **Lab Memeber 001-Level Customization**: Configure every nook and cranny to your liking!
+- 🖥️ **Runs Everywhere**: Windows, macOS, Linux – if it can run Python, it can run Chou Megumi Download!
 
-Megumi Download is a powerful, customizable Python application designed to automate the downloading and organization of anime episodes. It seamlessly integrates with your SFTP server, downloads new episodes, renames them according to your preferences, and even processes subtitles for an enhanced viewing experience.
+---
 
-## Features
+## 📦 Installation: Easier Than Making Instant Ramen!
 
-- 🚀 **Fast Downloads**: Utilizes chunked and parallel downloading for improved speed
-- 🗂️ **Automatic Organization**: Sorts episodes into series and season folders using TVDB standard (maintly for Kodi/Plex)
-- 🔄 **SFTP Integration**: Connects to your seedbox or remote server and download episodes automatically
-- 🎞️ **Subtitle Processing**: Extracts, modifies, and remuxes subtitles
-- ⚙️ **Highly Configurable**: Customize nearly every aspect of the application
-- 🖥️ **Cross-Platform**: Works on Windows, macOS, and Linux
-
-## Installation
-
-1. **Clone the Repository**
+1. **Clone the Repo**
    ```bash
    git clone https://github.com/HououinKyouma01/ChouMegumiDownload.git
    cd ChouMegumiDownload
    ```
 
-3. **Install Dependencies**
+2. **Install Dependencies**
    ```bash
-   pip install paramiko tqdm
+   pip install paramiko rich
+   ```
+   For macOS users experiencing issues:
+   ```bash
+   python3 -m pip install paramiko rich
    ```
 
-4. **Install MKVToolNix**
-   - **Windows**: Download and install from [MKVToolNix's official site](https://mkvtoolnix.download/)
-   - **macOS**: Use Homebrew: `brew install mkvtoolnix`
-   - **Linux**: Use your package manager, e.g., `sudo apt install mkvtoolnix`
+3. **Install MKVToolNix**
+   - **Windows**: Grab it from [MKVToolNix's official site](https://mkvtoolnix.download/)
+   - **macOS**: `brew install mkvtoolnix`
+   - **Linux**: `sudo apt install mkvtoolnix` (or use your distro's package manager)
 
-## Configuration
+---
 
-Chou Megumi Download uses three configuration files:
+## ⚙️ Configuration: Tailor It to Your Tastes!
 
-### 1. `config.megumi`
+### 1. `config.megumi`: The Heart of the Operation
 
-This is the main configuration file. Create it in the same directory as the script with the following options:
+Create this file in the script's directory. Here's a sample to get you started:
 
 ```ini
-HOST=your.sftp.server
-USER=your_username
-PASSWORD=your_password
-REMOTEPATCH=/path/to/remote/directory/
-LOCALPATCH=/path/to/local/anime/directory/
-LOCALTEMP=/path/to/temporary/download/directory/
+HOST=anime.seedbox.com
+USER=otaku_master
+PASSWORD=super_secret_password
+REMOTEPATCH=/home/user/anime/completed/
+LOCALPATCH=/Users/YourName/Movies/Anime/
+LOCALTEMP=/Users/YourName/Downloads/AnimeTemp/
 MOVELOCAL=OFF
 RENAME=ON
 SAVEINFO=ON
@@ -66,20 +66,9 @@ USE_CHUNKS=OFF
 BUFFER_SIZE=1048576
 ```
 
-- `HOST`, `USER`, `PASSWORD`: Your SFTP server details
-- `REMOTEPATCH`: The remote directory to download from
-- `LOCALPATCH`: Where to store the downloaded and organized anime
-- `LOCALTEMP`: Temporary directory for downloads
-- `MOVELOCAL`: Set to "ON" to move local files instead of downloading
-- `RENAME`: Set to "ON" to rename files to a standard format
-- `SAVEINFO`: Set to "ON" to save original filenames into .info file
-- `CHUNKS`: Number of chunks for parallel downloading
-- `USE_CHUNKS`: Set to "ON" to enable chunked downloading. OFF is recommended by now.
-- `BUFFER_SIZE`: Buffer size for chunk reading (in bytes, can be left as it is)
+### 2. `groups.megumi`: Your Anime Squad
 
-### 2. `groups.megumi`
-
-List the anime groups you want to download from, one per line:
+List your favorite release groups:
 
 ```
 Doki
@@ -92,9 +81,9 @@ Zafkiel
 SubsPlease
 ```
 
-### 3. `serieslist.megumi`
+### 3. `serieslist.megumi`: Your Anime Catalog
 
-Configure your anime series with the format: `file_name|folder_name|season_number`
+Format: `file_name|folder_name|season_number`
 
 ```
 One Room, Hiatari Futsuu, Tenshi-tsuki|One Room, Hiatari Futsuu, Tenshi-tsuki|1
@@ -111,25 +100,31 @@ Jiisan Baasan Wakagaeru|Jiisan Baasan Wakagaeru|1
 Mushoku Tensei S2|Mushoku Tensei|2
 ```
 
-## Usage
+---
 
-Run the script with:
+## 🎬 Usage: Action!
+
+Fire it up with:
 
 ```bash
 python chou_megumi_download.py
 ```
 
-The application will:
-1. Connect to your SFTP server
-2. Download new episodes
-3. Organize them into the specified directories
-4. Process subtitles if a `replace.txt` file is present in the series directory
+Alternatively, you can download the compiled executable in the "releases" tab
 
-## Advanced Options
+Sit back and watch as Chou Megumi Download:
+1. 🔗 Connects to your SFTP server
+2. 📥 Downloads fresh episodes
+3. 📁 Organizes them into your specified directories
+4. 🗣️ Processes subtitles (if `replace.txt` is present)
 
-### Subtitle Replacement
+---
 
-Create a `replace.txt` file in the series directory with replacements (like in example below from Hibike! Euphonium):
+## 🛠️ Advanced Tweaks for Power Users
+
+### Subtitle Replacement Magic
+
+Create a `replace.txt` in your series folder:
 
 ```
 Kato|Katou
@@ -223,19 +218,21 @@ Chieri Takashita|Takashita Chieri
 Asuka Tanaka|Tanaka Asuka
 ```
 
-### Chunked Downloading
+### Turbocharge Your Downloads
 
-Adjust `CHUNKS` and `BUFFER_SIZE` in `config.megumi` to optimize for your network (you can leave it as defeult):
-
+Adjust these in `config.megumi`:
 - Increase `CHUNKS` for faster connections
-- Adjust `BUFFER_SIZE` based on available memory and network speed
+- Tweak `BUFFER_SIZE` for optimal performance
 
-## Troubleshooting
+---
 
-- **SFTP Connection Issues**: Double-check your `HOST`, `USER`, and `PASSWORD` in `config.megumi`
-- **Slow Downloads**: Try increasing `CHUNKS` or `BUFFER_SIZE`
-- **File Organization Problems**: Ensure your `serieslist.megumi` is correctly formatted
-- **MacOS pip command not found**: use
-  ```bash
-   python3 -m pip install paramiko tqdm
-   ```
+## 🆘 Troubleshooting: When Things Go Yabai
+
+- 🔒 **SFTP Woes**: Double-check your `HOST`, `USER`, and `PASSWORD`
+- 🐌 **Snail-Paced Downloads**: Try bumping up `CHUNKS` or `BUFFER_SIZE`
+- 🗂️ **Folder Chaos**: Ensure `serieslist.megumi` is formatted correctly
+- 🍎 **macOS Hiccups**: Use `python3` instead of `python` for commands
+
+---
+
+Now go forth and download anime and never be like those filty tourists! 🎌✨
