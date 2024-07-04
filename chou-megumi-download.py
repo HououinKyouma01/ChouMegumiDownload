@@ -19,6 +19,7 @@ from rich.layout import Layout
 from rich.live import Live
 import time
 from rich.text import Text
+import requests
 
 console = Console()
 
@@ -140,7 +141,8 @@ class MegumiDownload:
             self.log(f"Series list file not found: {series_list_path}")
             sys.exit(1)
         return self.load_file_with_encodings(series_list_path, lambda f: [
-            dict(zip(['file_name', 'folder_name', 'season_number'], line.strip().split('|')))
+            dict(zip(['file_name', 'folder_name', 'season_number', 'replace_url'], 
+                     (line.strip().split('|') + [''])[:4]))
             for line in f if '|' in line
         ])
 
@@ -301,11 +303,20 @@ class MegumiDownload:
                     self.log(f"Moved file: {file.name} to {dest_file}")
 
                     if self.config.get('SAVEINFO', 'OFF').upper() == 'ON':
-                        with open(dest_dir / "info.txt", "a") as info_file:
+                        with open(dest_dir / "filelist.txt", "a") as info_file:
                             info_file.write(f"{file.name} ({new_name})\n")
-                        self.log(f"Saved file info to: {dest_dir / 'info.txt'}")
+                        self.log(f"Saved file info to: {dest_dir / 'filelist.txt'}")
 
-                    self.process_subtitles(dest_dir, dest_file)
+                    # Validate replace.txt file before processing subtitles
+                    replace_file = dest_dir / "replace.txt"
+                    if replace_file.exists():
+                        if self.validate_replace_file(replace_file):
+                            self.log(f"replace.txt for {matched_series['folder_name']} Season {matched_series['season_number']} is valid.")
+                            self.process_subtitles(dest_dir, dest_file)
+                        else:
+                            self.log(f"Warning: Invalid replace.txt found for {matched_series['folder_name']} Season {matched_series['season_number']}. Skipping subtitle processing.")
+                    else:
+                        self.log(f"No replace.txt found for {matched_series['folder_name']} Season {matched_series['season_number']}. Skipping subtitle processing.")
                 else:
                     self.log(f"Could not extract episode number from MKV filename: {file.name}")
             else:
@@ -315,13 +326,7 @@ class MegumiDownload:
 
     def process_subtitles(self, dest_dir, file_path):
         replace_file = dest_dir / "replace.txt"
-        self.log(f"Checking for replace.txt in: {dest_dir}")
-
-        if not replace_file.exists():
-            self.log(f"No replace.txt found for {file_path.name}. Skipping subtitle processing.")
-            return
-
-        self.log(f"replace.txt found for {file_path.name}. Proceeding with subtitle processing.")
+        self.log(f"Processing subtitles for {file_path.name}")
 
         subtitle_path = file_path.with_suffix('.ass')
         try:
@@ -342,8 +347,12 @@ class MegumiDownload:
 
         content = self.apply_standard_replacements(content)
 
-        with open(replace_file, 'r', encoding='utf-8') as f:
-            replacements = dict(line.strip().split('|') for line in f if '|' in line)
+        try:
+            with open(replace_file, 'r', encoding='utf-8') as f:
+                replacements = dict(line.strip().split('|') for line in f if '|' in line.strip())
+        except Exception as e:
+            self.log(f"Error reading replace.txt for {file_path.name}: {e}")
+            return
 
         for old, new in replacements.items():
             content = re.sub(r'\b' + re.escape(old) + r'\b', new, content)
@@ -370,6 +379,33 @@ class MegumiDownload:
             self.mkvmerge_log("mkvmerge error output:")
             self.mkvmerge_log(e.stdout)
             self.mkvmerge_log(e.stderr)
+
+    def validate_replace_file(self, replace_file):
+        try:
+            with open(replace_file, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+            
+            for i, line in enumerate(lines, 1):
+                line = line.strip()
+                if not line:  # Skip empty lines
+                    continue
+                if '|' not in line:
+                    self.log(f"Warning: Invalid format in replace.txt at line {i}. Expected '|' separator.")
+                    return False
+                
+                parts = line.split('|')
+                if len(parts) != 2:
+                    self.log(f"Warning: Invalid format in replace.txt at line {i}. Expected exactly one '|' separator.")
+                    return False
+                
+                if not parts[0].strip() or not parts[1].strip():
+                    self.log(f"Warning: Empty replacement found in replace.txt at line {i}.")
+                    return False
+
+            return True
+        except Exception as e:
+            self.log(f"Error validating replace.txt: {e}")
+            return False
 
     def format_progress_output(self, output):
         lines = output.split('\n')
@@ -402,9 +438,53 @@ class MegumiDownload:
             text = text.replace(old, new)
         return text
 
+    def download_replace_file(self, series):
+        if not series['replace_url']:
+            return
+
+        self.log(f"Downloading replace.txt for {series['folder_name']} Season {series['season_number']}")
+        
+        try:
+            response = requests.get(series['replace_url'])
+            response.raise_for_status()
+            content = response.text
+
+            if not self.is_plain_text(content):
+                self.log(f"Warning: The content at {series['replace_url']} is not plain text. Skipping.")
+                return
+
+            dest_dir = Path(self.config['LOCALPATCH']) / series['folder_name'] / f"Season {series['season_number']}"
+            dest_dir.mkdir(parents=True, exist_ok=True)
+
+            replace_file = dest_dir / "replace.txt"
+            
+            # Always write the new content
+            with open(replace_file, 'w', encoding='utf-8') as f:
+                f.write(content)
+            self.log(f"Updated replace.txt for {series['folder_name']} Season {series['season_number']}")
+
+            if not self.validate_replace_file(replace_file):
+                self.log(f"Warning: Downloaded replace.txt for {series['folder_name']} Season {series['season_number']} has invalid format.")
+            else:
+                self.log(f"Successfully validated replace.txt for {series['folder_name']} Season {series['season_number']}")
+
+        except requests.RequestException as e:
+            self.log(f"Error downloading replace.txt for {series['folder_name']} Season {series['season_number']}: {e}")
+
+    def is_plain_text(self, content):
+        try:
+            content.encode('ascii')
+            return True
+        except UnicodeEncodeError:
+            return False
+
     def run(self):
         with self.live:
             self.log("Starting Megumi Download")
+
+            # Download replace.txt files
+            for series in self.series_list:
+                self.download_replace_file(series)
 
             temp_dir = self.download_files()
 
