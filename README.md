@@ -223,7 +223,7 @@ Michie Matsumoto|Matsumoto Michie
 Chieri Takashita|Takashita Chieri
 Asuka Tanaka|Tanaka Asuka
 ```
-When using a URL for automatic list download, ensure it points to a plain text file with the correct formatting. The script will validate the content before using it for subtitle processing.
+When using a URL for automatic list download, ensure it points to a plain text file with the correct formatting. The script will validate the content before using it for subtitle processing. If you use pastebin, make sure you're using "raw" link (pastebin.com/**raw**/file) that will provide plain text.
 
 ### Turbocharge Your Downloads
 
