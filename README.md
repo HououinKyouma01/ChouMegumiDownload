@@ -83,7 +83,7 @@ SubsPlease
 
 ### 3. `serieslist.megumi`: Your Anime Catalog
 
-Format: `title_in_file_name|series_folder_name|season_number`
+Format: `title_in_file_name|series_folder_name|season_number|replace_url`
 
 ```
 One Room, Hiatari Futsuu, Tenshi-tsuki|One Room, Hiatari Futsuu, Tenshi-tsuki|1
@@ -95,10 +95,12 @@ The Dangers in My Heart S2|Boku no Kokoro no Yabai Yatsu|2
 Yuru Camp S3|Yuru Camp|3
 Hananoi-kun to Koi no Yamai|Hananoi-kun to Koi no Yamai|1
 Jellyfish Can't Swim in the Night|Yoru no Kurage wa Oyogenai|1
-Hibike! Euphonium S3|Hibike! Euphonium|3
+Hibike! Euphonium S3|Hibike! Euphonium|3|https://example.com/hibike_euphonium_replace.txt
 Jiisan Baasan Wakagaeru|Jiisan Baasan Wakagaeru|1
 Mushoku Tensei S2|Mushoku Tensei|2
 ```
+
+Note: The `replace_url` is optional. If provided, the script will automatically download the replace.txt file from the specified URL.
 
 ---
 
@@ -221,6 +223,7 @@ Michie Matsumoto|Matsumoto Michie
 Chieri Takashita|Takashita Chieri
 Asuka Tanaka|Tanaka Asuka
 ```
+When using a URL for automatic list download, ensure it points to a plain text file with the correct formatting. The script will validate the content before using it for subtitle processing.
 
 ### Turbocharge Your Downloads
 
