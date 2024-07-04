@@ -355,12 +355,24 @@ class MegumiDownload:
             return
 
         for old, new in replacements:
-            # Escape special regex characters in the old string
-            old_escaped = re.escape(old)
-            # Create a pattern that matches the whole word, considering special characters
-            pattern = r'(^|[\s\-\{\}])' + old_escaped + r'($|[\s\-\{\}])'
-            # Replace using the pattern, preserving the surrounding characters
-            content = re.sub(pattern, r'\1' + new + r'\2', content)
+            old_words = old.split()
+            if len(old_words) == 1:
+                # Single word replacement
+                pattern = r'\b' + re.escape(old) + r"(?:(?:'s?|-\w+)?\b|(?=[.,!?\s]|$))"
+            else:
+                # Multi-word phrase replacement
+                pattern = r'\b' + re.escape(old) + r"(?:'s?\b|(?=[.,!?\s]|$))"
+            
+            def replace_func(match):
+                matched = match.group(0)
+                if matched.endswith("'s") or matched.endswith("'"):
+                    return new + matched[-2:]
+                elif '-' in matched and '-' not in old:
+                    suffix = matched[len(old):]
+                    return new + suffix
+                return new
+
+            content = re.sub(pattern, replace_func, content)
 
         with open(subtitle_path, 'w', encoding='utf-8') as f:
             f.write(content)
@@ -437,7 +449,7 @@ class MegumiDownload:
             ("K-k", "K-K"), ("L-l", "L-L"), ("M-m", "M-M"), ("N-n", "N-N"), ("O-o", "O-O"),
             ("P-p", "P-P"), ("Q-q", "Q-Q"), ("R-r", "R-R"), ("S-s", "S-S"), ("T-t", "T-T"),
             ("U-u", "U-U"), ("W-w", "W-W"), ("Y-y", "Y-Y"), ("Z-z", "Z-Z"),
-            ("\\N", "\\N "), ("\\h", "\\h "),
+            ("\\N", " \\N "), ("\\h", "\\h "),
         ]
         for old, new in replacements:
             text = text.replace(old, new)
