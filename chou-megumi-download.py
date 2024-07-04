@@ -349,13 +349,18 @@ class MegumiDownload:
 
         try:
             with open(replace_file, 'r', encoding='utf-8') as f:
-                replacements = dict(line.strip().split('|') for line in f if '|' in line.strip())
+                replacements = [line.strip().split('|') for line in f if '|' in line.strip()]
         except Exception as e:
             self.log(f"Error reading replace.txt for {file_path.name}: {e}")
             return
 
-        for old, new in replacements.items():
-            content = re.sub(r'\b' + re.escape(old) + r'\b', new, content)
+        for old, new in replacements:
+            # Escape special regex characters in the old string
+            old_escaped = re.escape(old)
+            # Create a pattern that matches the whole word, considering special characters
+            pattern = r'(^|[\s\-\{\}])' + old_escaped + r'($|[\s\-\{\}])'
+            # Replace using the pattern, preserving the surrounding characters
+            content = re.sub(pattern, r'\1' + new + r'\2', content)
 
         with open(subtitle_path, 'w', encoding='utf-8') as f:
             f.write(content)
