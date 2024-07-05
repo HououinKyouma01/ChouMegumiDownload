@@ -31,11 +31,11 @@ It's a cross-platform version of a program previously written in C# called [Megu
 
 2. **Install Dependencies**
    ```bash
-   pip install paramiko rich
+   pip install paramiko rich psutil
    ```
    For macOS users experiencing issues:
    ```bash
-   python3 -m pip install paramiko rich
+   python3 -m pip install paramiko rich psutil
    ```
 
 3. **Install MKVToolNix**
