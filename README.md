@@ -35,7 +35,7 @@ It's a cross-platform version of a program previously written in C# called [Megu
    ```
    For macOS users experiencing issues:
    ```bash
-   python3 -m pip install paramiko rich psutil
+   python3 -m pip install asyncssh aiohttp rich paramiko psutil
    ```
 
 3. **Install MKVToolNix**
@@ -62,8 +62,7 @@ MOVELOCAL=OFF
 RENAME=ON
 SAVEINFO=ON
 CHUNKS=4
-USE_CHUNKS=OFF
-BUFFER_SIZE=1048576
+USE_CHUNKS=ON
 ```
 
 ### 2. `groups.megumi`: Your Anime Squad
@@ -229,7 +228,6 @@ When using a URL for automatic list download, ensure it points to a plain text f
 
 Adjust these in `config.megumi`:
 - Increase `CHUNKS` for faster connections
-- Tweak `BUFFER_SIZE` for optimal performance
 
 ---
 
