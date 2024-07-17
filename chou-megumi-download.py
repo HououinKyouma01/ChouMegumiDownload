@@ -1,11 +1,9 @@
 import sys
 import re
 import shutil
-import paramiko
 import logging
 from pathlib import Path, PurePosixPath
 import subprocess
-import concurrent.futures
 import threading
 import math
 import tempfile
@@ -20,6 +18,11 @@ from rich.live import Live
 import time
 from rich.text import Text
 import requests
+import os
+import psutil
+import asyncio
+import aiohttp
+import asyncssh
 
 console = Console()
 
@@ -28,21 +31,45 @@ class SingleInstanceChecker:
         self.lockfile = Path(tempfile.gettempdir()) / 'megumi_download.lock'
         self.lock_handle = None
 
+    def __enter__(self):
+        if self.try_lock():
+            return self
+        else:
+            console.print("[bold red]Another instance of Megumi Download is already running. Exiting.[/bold red]")
+            sys.exit(1)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.unlock()
+
     def try_lock(self):
+        if self.lockfile.exists():
+            if self.is_lock_stale():
+                self.unlock()
+            else:
+                return False
+
         try:
+            self.lock_handle = open(self.lockfile, 'w')
             if sys.platform == 'win32':
                 import msvcrt
-                self.lock_handle = open(self.lockfile, 'w')
                 msvcrt.locking(self.lock_handle.fileno(), msvcrt.LK_NBLCK, 1)
             else:
                 import fcntl
-                self.lock_handle = open(self.lockfile, 'w')
-                fcntl.lockf(self.lock_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                fcntl.flock(self.lock_handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
             
-            atexit.register(self.unlock)
+            self.lock_handle.write(str(os.getpid()))
+            self.lock_handle.flush()
             return True
         except (IOError, OSError):
             return False
+
+    def is_lock_stale(self):
+        try:
+            with open(self.lockfile, 'r') as f:
+                pid = int(f.read().strip())
+            return not psutil.pid_exists(pid)
+        except (IOError, ValueError):
+            return True
 
     def unlock(self):
         if self.lock_handle is not None:
@@ -52,14 +79,16 @@ class SingleInstanceChecker:
                     msvcrt.locking(self.lock_handle.fileno(), msvcrt.LK_UNLCK, 1)
                 else:
                     import fcntl
-                    fcntl.lockf(self.lock_handle, fcntl.LOCK_UN)
-            except ValueError:
+                    fcntl.flock(self.lock_handle, fcntl.LOCK_UN)
+            except Exception:
                 pass
             finally:
+                self.lock_handle.close()
                 try:
-                    self.lock_handle.close()
-                except:
+                    self.lockfile.unlink()
+                except OSError:
                     pass
+        elif self.lockfile.exists():
             try:
                 self.lockfile.unlink()
             except OSError:
@@ -67,7 +96,7 @@ class SingleInstanceChecker:
 
 class MegumiDownload:
     def __init__(self):
-        self.script_dir = Path(__file__).parent.resolve()
+        self.script_dir = self.get_script_dir()
         self.setup_logging()
         self.config = self.load_config()
         self.groups = self.load_groups()
@@ -93,6 +122,12 @@ class MegumiDownload:
         self.mkvmerge_content = ""
         self.mkvmerge_layout_ready = False
         self.live = Live(self.layout, refresh_per_second=4)
+
+    def get_script_dir(self):
+        if getattr(sys, 'frozen', False):
+            return Path(sys.executable).parent
+        else:
+            return Path(os.path.dirname(os.path.abspath(__file__)))
 
     def setup_logging(self):
         logging.basicConfig(
@@ -157,121 +192,164 @@ class MegumiDownload:
             self.layout["mkvmerge"].update(Panel(self.mkvmerge_content.strip(), title="MKVMerge Output", border_style="blue", expand=True))
             self.live.refresh()
 
-    def download_chunk(self, ssh, remote_path, file, start, end, chunk_file, file_task):
-        sftp = ssh.open_sftp()
-        try:
-            with sftp.open(str(PurePosixPath(remote_path) / file), 'rb') as remote_file:
-                remote_file.seek(start)
+    async def download_chunk_async(self, session, conn, remote_path, file, start, end, chunk_file, file_task):
+        async with conn.start_sftp_client() as sftp:
+            async with await sftp.open(str(PurePosixPath(remote_path) / file), 'rb') as remote_file:
+                await remote_file.seek(start)
                 bytes_to_read = end - start
                 with open(chunk_file, 'wb') as f:
                     while bytes_to_read > 0:
-                        data = remote_file.read(min(bytes_to_read, 1048576))
+                        chunk_size = min(bytes_to_read, 32768)  # 32 KB chunks
+                        data = await remote_file.read(chunk_size)
                         if not data:
                             break
                         f.write(data)
                         bytes_to_read -= len(data)
                         self.progress.update(file_task, advance=len(data))
-            return chunk_file
-        finally:
-            sftp.close()
+        return chunk_file
 
-    def download_file(self, ssh, remote_path, file):
+    async def download_file_async(self, conn, remote_path, file):
         local_path = self.temp_dir / file
         remote_file_path = PurePosixPath(remote_path) / file
         if local_path.exists():
             local_path.unlink()
-        self.log(f"Attempting to download: {file}")
+        self.log(f"Starting download: {file}")
 
-        with ssh.open_sftp() as sftp:
-            file_size = sftp.stat(str(remote_file_path)).st_size
+        try:
+            async with conn.start_sftp_client() as sftp:
+                file_size = (await sftp.stat(str(remote_file_path))).size
+                file_task = self.progress.add_task(file, total=file_size)
 
-        file_task = self.progress.add_task(file, total=file_size)
+                async with sftp.open(str(remote_file_path), 'rb') as remote_file:
+                    with open(local_path, 'wb') as local_file:
+                        chunk_size = 1024 * 1024  # 1 MB chunks
+                        downloaded = 0
+                        while True:
+                            chunk = await remote_file.read(chunk_size)
+                            if not chunk:
+                                break
+                            local_file.write(chunk)
+                            downloaded += len(chunk)
+                            self.progress.update(file_task, completed=downloaded)
 
-        if self.use_chunks and file_size > 1024 * 1024:
-            chunk_size = math.ceil(file_size / self.chunks)
-            chunk_files = []
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self.chunks) as executor:
-                futures = [
-                    executor.submit(self.download_chunk, ssh, remote_path, file, 
-                                    i * chunk_size, min((i + 1) * chunk_size, file_size), 
-                                    local_path.with_suffix(f'.part{i}'), file_task)
-                    for i in range(self.chunks)
-                ]
-                concurrent.futures.wait(futures)
-                chunk_files = [f.result() for f in futures if f.result() is not None]
+                if local_path.stat().st_size == file_size:
+                    await sftp.remove(str(remote_file_path))
+                    self.log(f"Successfully downloaded and removed remote file: {file}")
+                    self.progress.remove_task(file_task)
+                    return file, "success"
+                else:
+                    self.log(f"Downloaded file {file} size mismatch. Deleting local copy.")
+                    local_path.unlink()
+                    self.progress.remove_task(file_task)
+                    return file, "error"
 
-            with open(local_path, 'wb') as outfile:
-                for chunk_file in chunk_files:
-                    with open(chunk_file, 'rb') as infile:
-                        shutil.copyfileobj(infile, outfile)
-                    Path(chunk_file).unlink()
-        else:
-            with ssh.open_sftp() as sftp:
-                sftp.get(str(remote_file_path), str(local_path), 
-                         callback=lambda current, total: self.progress.update(file_task, completed=current))
+        except Exception as e:
+            self.log(f"Error downloading {file}: {str(e)}")
+            if file_task:
+                self.progress.remove_task(file_task)
+            return file, "error"
 
-        if local_path.stat().st_size > 0:
-            self.log(f"Successfully downloaded: {file}")
-            with ssh.open_sftp() as sftp:
-                sftp.remove(str(remote_file_path))
-                self.log(f"Removed remote file: {file}")
-        else:
-            self.log(f"Downloaded file {file} is empty. Deleting local copy.")
-            local_path.unlink()
-
-        self.progress.remove_task(file_task)
-
-    def download_files(self):
+    async def download_files_async(self):
         if self.config.get('MOVELOCAL', 'OFF').upper() == 'OFF':
-            ssh = paramiko.SSHClient()
-            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             try:
-                ssh.connect(self.config['HOST'], username=self.config['USER'], password=self.config['PASSWORD'])
+                asyncssh.set_debug_level(1)  # Reduce debug output
 
-                remote_path = self.config['REMOTEPATCH']
-                self.log(f"Attempting to list directory: {remote_path}")
+                async with asyncssh.connect(
+                    self.config['HOST'],
+                    username=self.config['USER'],
+                    password=self.config['PASSWORD'],
+                    known_hosts=None
+                ) as conn:
+                    remote_path = self.config['REMOTEPATCH']
+                    self.log(f"Attempting to list directory: {remote_path}")
 
-                with ssh.open_sftp() as sftp:
-                    remote_files = sftp.listdir(remote_path)
+                    async with conn.start_sftp_client() as sftp:
+                        remote_files = await sftp.listdir(remote_path)
                     self.log(f"Successfully listed directory: {remote_path}")
 
-                self.temp_dir.mkdir(parents=True, exist_ok=True)
-                self.log(f"Files will be temporarily downloaded to: {self.temp_dir}")
+                    self.temp_dir.mkdir(parents=True, exist_ok=True)
+                    self.log(f"Files will be temporarily downloaded to: {self.temp_dir}")
 
-                for temp_file in self.temp_dir.glob('*.mkv'):
-                    if temp_file.name in remote_files:
-                        temp_file.unlink()
-                        self.log(f"Removed existing temporary file: {temp_file.name}")
+                    for temp_file in self.temp_dir.glob('*.mkv'):
+                        if temp_file.name in remote_files:
+                            temp_file.unlink()
+                            self.log(f"Removed existing temporary file: {temp_file.name}")
 
-                files_to_download = [
-                    file for file in remote_files 
-                    if file.lower().endswith('.mkv') and 
-                    any(f"[{group}]" in file or f"【{group}】" in file for group in self.groups)
-                ]
-            
-                self.log(f"Found {len(files_to_download)} MKV files to download")
-            
-                overall_task = self.progress.add_task("Overall", total=len(files_to_download))
+                    files_to_download = [
+                        file for file in remote_files 
+                        if file.lower().endswith('.mkv') and 
+                        any(f"[{group}]" in file or f"【{group}】" in file for group in self.groups)
+                    ]
                 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-                    futures = [executor.submit(self.download_file, ssh, remote_path, file) for file in files_to_download]
-                    concurrent.futures.wait(futures)
+                    self.log(f"Found {len(files_to_download)} MKV files to download")
+                
+                    if not files_to_download:
+                        self.log("No files to download. Check your group settings and remote directory contents.")
+                        return None
 
-                ssh.close()
+                    overall_task = self.progress.add_task("Overall", total=len(files_to_download))
+                    
+                    max_concurrent_downloads = 3  # Adjust this value as needed
+                    semaphore = asyncio.Semaphore(max_concurrent_downloads)
+                    
+                    async def download_with_semaphore(file):
+                        async with semaphore:
+                            return await self.download_file_async(conn, remote_path, file)
+
+                    tasks = [asyncio.create_task(download_with_semaphore(file)) for file in files_to_download]
+                    
+                    successful_downloads = []
+                    failed_downloads = []
+
+                    for task in asyncio.as_completed(tasks):
+                        try:
+                            file, status = await task
+                            if status == "success":
+                                self.log(f"Successfully downloaded: {file}")
+                                successful_downloads.append(file)
+                            elif status == "error":
+                                self.log(f"Failed to download: {file}")
+                                failed_downloads.append(file)
+                            
+                            self.progress.update(overall_task, advance=1)
+                        except Exception as e:
+                            self.log(f"Exception occurred during download: {str(e)}")
+                            failed_downloads.append(str(e))
+                            self.progress.update(overall_task, advance=1)
+
+                    self.log(f"Download process completed. {len(successful_downloads)} files downloaded successfully.")
+                    
+                    if failed_downloads:
+                        self.log(f"The following {len(failed_downloads)} files failed to download: {', '.join(map(str, failed_downloads))}")
+
             except Exception as e:
-                self.log(f"Error during SFTP operations: {e}")
-                sys.exit(1)
+                self.log(f"Error during SFTP operations: {str(e)}")
+                return None
         else:
             self.log("MOVELOCAL option is ON. Processing local MKV files.")
             self.temp_dir = Path(self.config['LOCALTEMP'])
             if not self.temp_dir.exists():
                 self.log(f"Local temp directory not found: {self.temp_dir}")
-                sys.exit(1)
+                return None
             
             files_to_process = list(self.temp_dir.glob('*.mkv'))
+            if not files_to_process:
+                self.log(f"No MKV files found in {self.temp_dir}")
+                return None
             self.log(f"Found {len(files_to_process)} MKV files to process in {self.temp_dir}")
 
         return self.temp_dir
+
+    def download_files(self):
+        try:
+            temp_dir = asyncio.run(self.download_files_async())
+            if temp_dir is None:
+                self.log("Error: Failed to download or locate files. Check your configuration and network connection.")
+                return None
+            return temp_dir
+        except Exception as e:
+            self.log(f"Error in download_files: {str(e)}")
+            return None
 
     def move_files(self, temp_dir):
         self.log(f"Starting to move files from {temp_dir}")
@@ -355,22 +433,19 @@ class MegumiDownload:
             return
 
         for old, new in replacements:
-            old_words = old.split()
-            if len(old_words) == 1:
-                # Single word replacement
-                pattern = r'\b' + re.escape(old) + r"(?:(?:'s?|-\w+)?\b|(?=[.,!?\s]|$))"
-            else:
-                # Multi-word phrase replacement
-                pattern = r'\b' + re.escape(old) + r"(?:'s?\b|(?=[.,!?\s]|$))"
+            old_escaped = re.escape(old)
+            pattern = r'(?<!\w)' + old_escaped + r'(?!\w)'
             
             def replace_func(match):
                 matched = match.group(0)
-                if matched.endswith("'s") or matched.endswith("'"):
-                    return new + matched[-2:]
-                elif '-' in matched and '-' not in old:
-                    suffix = matched[len(old):]
-                    return new + suffix
-                return new
+                if matched.endswith("'s"):
+                    return new + "'s"
+                elif matched.endswith("'"):
+                    return new + "'"
+                elif '-' in new and '-' not in matched:
+                    return new
+                else:
+                    return new
 
             content = re.sub(pattern, replace_func, content)
 
@@ -504,6 +579,9 @@ class MegumiDownload:
                 self.download_replace_file(series)
 
             temp_dir = self.download_files()
+            if temp_dir is None:
+                self.log("Aborting due to download failure.")
+                return
 
             # Remove the progress layout after downloading and add MKVMerge output layout
             self.layout["progress"].visible = False
@@ -523,16 +601,11 @@ class MegumiDownload:
             time.sleep(2)
 
 if __name__ == "__main__":
-    instance_checker = SingleInstanceChecker()
-    
-    if instance_checker.try_lock():
+    with SingleInstanceChecker() as instance_check:
         try:
             downloader = MegumiDownload()
             downloader.run()
         except Exception as e:
             console.print_exception()
         finally:
-            instance_checker.unlock()
-    else:
-        console.print("[bold red]Another instance of Megumi Download is already running. Exiting.[/bold red]")
-        sys.exit(1)
+            print("Megumi Download completed.")
