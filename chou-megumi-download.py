@@ -279,21 +279,54 @@ class MegumiDownload:
                     self.log(f"Found {len(files_to_download)} MKV files to download")
                 
                     if files_to_download:
-                        # ... (download logic remains the same)
-                        pass
+                        overall_task = self.progress.add_task("Overall", total=len(files_to_download))
+                        
+                        max_concurrent_downloads = 3  # Adjust this value as needed
+                        semaphore = asyncio.Semaphore(max_concurrent_downloads)
+                        
+                        async def download_with_semaphore(file):
+                            async with semaphore:
+                                return await self.download_file_async(conn, remote_path, file)
+
+                        tasks = [asyncio.create_task(download_with_semaphore(file)) for file in files_to_download]
+                        
+                        successful_downloads = []
+                        failed_downloads = []
+
+                        for task in asyncio.as_completed(tasks):
+                            try:
+                                file, status = await task
+                                if status == "success":
+                                    self.log(f"Successfully downloaded: {file}")
+                                    successful_downloads.append(file)
+                                elif status == "error":
+                                    self.log(f"Failed to download: {file}")
+                                    failed_downloads.append(file)
+                                
+                                self.progress.update(overall_task, advance=1)
+                            except Exception as e:
+                                self.log(f"Exception occurred during download: {str(e)}")
+                                failed_downloads.append(str(e))
+                                self.progress.update(overall_task, advance=1)
+
+                        self.log(f"Download process completed. {len(successful_downloads)} files downloaded successfully.")
+                        
+                        if failed_downloads:
+                            self.log(f"The following {len(failed_downloads)} files failed to download: {', '.join(map(str, failed_downloads))}")
                     else:
                         self.log("No new files to download.")
 
             except Exception as e:
                 self.log(f"Error during SFTP operations: {str(e)}")
+                return None
 
-        # Process existing files in temp_dir regardless of download success
+        # Check for existing files in temp_dir
         existing_files = list(self.temp_dir.glob('*.mkv'))
         if existing_files:
-            self.log(f"Found {len(existing_files)} existing MKV files in the download directory.")
+            self.log(f"Found {len(existing_files)} MKV files in the download directory.")
             return self.temp_dir
         else:
-            self.log("No files found in the download directory.")
+            self.log("No MKV files found in the download directory.")
             return None
 
     def download_files(self):
