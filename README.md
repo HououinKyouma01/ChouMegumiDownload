@@ -31,7 +31,7 @@ It's a cross-platform version of a program previously written in C# called [Megu
 
 2. **Install Dependencies**
    ```bash
-   pip install paramiko rich psutil
+   pip install asyncssh aiohttp rich paramiko psutil
    ```
    For macOS users experiencing issues:
    ```bash
