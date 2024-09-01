@@ -513,7 +513,14 @@ class MegumiDownload:
             ("K-k", "K-K"), ("L-l", "L-L"), ("M-m", "M-M"), ("N-n", "N-N"), ("O-o", "O-O"),
             ("P-p", "P-P"), ("Q-q", "Q-Q"), ("R-r", "R-R"), ("S-s", "S-S"), ("T-t", "T-T"),
             ("U-u", "U-U"), ("W-w", "W-W"), ("Y-y", "Y-Y"), ("Z-z", "Z-Z"),
-            ("\\N", " \\N "), ("\\h", "\\h "),
+            ("\\N", " \\N "), ("\\h", "\\h "), ("pigtails", "twintails"), ("Pigtails", "Twintails"),
+			("Pigtail", "Twintail"), ("P-Pigtails", "T-Twintails"), ("pigtail", "twintail"), ("pop idol", "idol"),
+			("Pop idol", "Idol"), ("kohai", "kouhai"), ("Kohai", "Kouhai"), ("kohai", "kouhai"),
+			("Holy shit", "Wow"), ("holy shit", "wow"), ("C'mon", "Come on"), ("M-Meow", "N-Nyan"), ("Meow", "Nyan"),
+			("Little Sister", "Younger Sister"), ("Little sister", "Younger sister"), ("little Sister", "younger sister"),
+			("Big Sister", "Older Sister"), ("Big sister", "Older sister"), ("big sister", "older sister"),
+			("Big Brother", "Older Brother"), ("Big brother", "Older brother"), ("big brother", "older brother"),
+			("Pin-Up Girl", "Gravure Idol"), ("Pin-Up Girl", "Gravure Idol"),
         ]
         for old, new in replacements:
             text = text.replace(old, new)
