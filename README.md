@@ -23,6 +23,8 @@ It's a cross-platform version of a program previously written in C# called [Megu
 
 ## 📦 Installation: Easier Than Making Instant Ramen!
 
+### 🖥️ For Python Version:
+
 1. **Clone the Repo**
    ```bash
    git clone https://github.com/HououinKyouma01/ChouMegumiDownload.git
@@ -31,17 +33,38 @@ It's a cross-platform version of a program previously written in C# called [Megu
 
 2. **Install Dependencies**
    ```bash
-   pip install asyncssh aiohttp rich paramiko psutil
+   pip install asyncssh aiohttp rich paramiko psutil ass
    ```
    For macOS users experiencing issues:
    ```bash
-   python3 -m pip install asyncssh aiohttp rich paramiko psutil
+   python3 -m pip install asyncssh aiohttp rich paramiko psutil ass
    ```
 
-3. **Install MKVToolNix**
-   - **Windows**: Grab it from [MKVToolNix's official site](https://mkvtoolnix.download/)
-   - **macOS**: `brew install mkvtoolnix`
-   - **Linux**: `sudo apt install mkvtoolnix` (or use your distro's package manager)
+3. **Install Required Tools**
+   - **MKVToolNix**:
+     - Windows: Grab it from [MKVToolNix's official site](https://mkvtoolnix.download/)
+     - macOS: `brew install mkvtoolnix`
+     - Linux: `sudo apt install mkvtoolnix`
+   - **FFmpeg** (optional but recommended for timing fixes):
+     - Windows: Download from [FFmpeg's site](https://ffmpeg.org/download.html)
+     - macOS: `brew install ffmpeg`
+     - Linux: `sudo apt install ffmpeg`
+
+   💡 Pro Tip: You can place `mkvmerge.exe`, `mkvextract.exe`, and `ffmpeg.exe` in the script folder to use them without adding to PATH!
+
+### 📦 For Compiled Version (Recommended):
+
+1. **Download the latest release** from the [Releases page](https://github.com/HououinKyouma01/ChouMegumiDownload/releases)
+2. **Place these files in the same folder**:
+   - `chou-megumi-download.exe`
+   - `config.megumi`
+   - `groups.megumi`
+   - `serieslist.megumi`
+3. **Download required tools**:
+   - [MKVToolNix](https://mkvtoolnix.download/) - place `mkvmerge.exe` and `mkvextract.exe` in the same folder
+   - [FFmpeg](https://ffmpeg.org/download.html) - place `ffmpeg.exe` in the same folder (optional but recommended for timing fixes)
+
+   🚀 That's it! Just run `chou-megumi-download.exe` and enjoy!
 
 ---
 
@@ -123,7 +146,9 @@ Sit back and watch as Chou Megumi Download:
 
 ## 🛠️ Tweak your subtitles
 
-### Subtitle Replacement Magic
+### 🎬 Advanced Features
+
+#### Subtitle Replacement Magic
 
 Create a `replace.txt` in your series folder (for example `C:\Anime\Hibike! Euphonium\Season 3\replace.txt`) and fill it with everthing you want to replace using:
 
@@ -224,14 +249,62 @@ Asuka Tanaka|Tanaka Asuka
 ```
 When using a URL for automatic list download, ensure it points to a plain text file with the correct formatting. The script will validate the content before using it for subtitle processing. If you use pastebin, make sure you're using "raw" link (pastebin.com/**raw**/file) that will provide plain text.
 
-### Turbocharge Your Downloads
+### 🕒 Timing Fix Magic - Fixing Hidive/Sentai Subtitles
+
+Hidive/Sentai subtitles are notorious for bad timing - subtitles appearing too early/late or not matching scene changes. This feature fixes almost all timing issues by:
+
+1. Re-encoding the video (using fast preset) to create proper keyframes at scene changes
+2. Adjusting subtitles to:
+   - Start/end exactly when scenes change
+   - Be adjacent to each other (no gaps between lines)
+   - Not overlap or blink
+
+To use:
+1. Add `FixTiming` after the season number in `serieslist.megumi`:
+   ```
+   Hibike! Euphonium S3|Hibike! Euphonium|3|FixTiming
+   ```
+2. The program will automatically:
+   - Re-encode the video (fast preset, 720p, original audio)
+   - Extract and adjust subtitles to match new keyframes
+   - Remux everything back together to original file and delete temp files
+
+💡 Requires FFmpeg! Place `ffmpeg.exe` in the program folder or haing it in system PATH.
+💡 Using this option, the app run will be slower due to necessary re-encoding.
+
+Example fixes:
+- Subtitles appearing before scene changes → Fixed!
+- Subtitles lingering after scene changes → Fixed!
+- Gaps between subtitle lines → Fixed!
+- Overlapping subtitles → Fixed!
+
+### ⚡ Turbocharge Your Downloads
 
 Adjust these in `config.megumi`:
-- Increase `CHUNKS` for faster connections
+- `CHUNKS`: Number of parallel downloads (3-5 recommended)
+- `USE_CHUNKS`: Set to ON for faster downloads
+- `MOVELOCAL`: Set to ON if files are already on your local machine
 
 ---
 
 ## 🆘 Troubleshooting: When Things Go Yabai
+
+### Common Issues:
+- **SFTP Connection Problems**:
+  - Double-check `HOST`, `USER`, and `PASSWORD` in `config.megumi`
+  - Ensure your seedbox allows SFTP connections
+
+- **Subtitle Timing Fix Errors**:
+  - Make sure `ffmpeg.exe` is in the program folder
+  - Check `errorlog.txt` for details
+
+- **MKVToolNix Issues**:
+  - Place `mkvmerge.exe` and `mkvextract.exe` in the program folder
+  - Ensure you're using the latest version
+
+- **Compiled Version Not Working**:
+  - Make sure all required `.exe` files are in the same folder
+  - Run as Administrator if you get permission errors
 
 - 🔒 **SFTP Woes**: Double-check your `HOST`, `USER`, and `PASSWORD`
 - 🐌 **Snail-Paced Downloads**: Try bumping up `CHUNKS` or `BUFFER_SIZE`
