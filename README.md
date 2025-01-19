@@ -249,9 +249,9 @@ Asuka Tanaka|Tanaka Asuka
 ```
 When using a URL for automatic list download, ensure it points to a plain text file with the correct formatting. The script will validate the content before using it for subtitle processing. If you use pastebin, make sure you're using "raw" link (pastebin.com/**raw**/file) that will provide plain text.
 
-### 🕒 Timing Fix Magic - Fixing Hidive/Sentai Subtitles
+### 🕒 Timing Fix Magic - Fixing Subtitle timing problems
 
-Hidive/Sentai subtitles are notorious for bad timing - subtitles appearing too early/late or not matching scene changes. This feature fixes almost all timing issues by:
+Hidive/Sentai subtitles are notorious for terrible timing - subtitles appearing too early/late or not matching scene changes. This feature fixes almost all timing issues by:
 
 1. Re-encoding the video (using fast preset) to create proper keyframes at scene changes
 2. Adjusting subtitles to:
