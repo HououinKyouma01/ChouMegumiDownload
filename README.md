@@ -269,7 +269,8 @@ To use:
    - Extract and adjust subtitles to match new keyframes
    - Remux everything back together to original file and delete temp files
 
-💡 Requires FFmpeg! Place `ffmpeg.exe` in the program folder or haing it in system PATH.
+💡 Requires FFmpeg! Place `ffmpeg.exe` in the program folder or having it in system PATH.
+
 💡 Using this option, the app run will be slower due to necessary re-encoding.
 
 Example fixes:
