@@ -30,8 +30,11 @@ class SingleInstanceChecker:
     def __init__(self):
         self.lockfile = Path(tempfile.gettempdir()) / 'megumi_download.lock'
         self.lock_handle = None
+        self.is_subprocess = '--subprocess' in sys.argv
 
     def __enter__(self):
+        if self.is_subprocess:
+            return self  # Skip checking for subprocesses
         if self.try_lock():
             return self
         else:
@@ -176,14 +179,52 @@ class MegumiDownload:
             self.log(f"Series list file not found: {series_list_path}")
             sys.exit(1)
         return self.load_file_with_encodings(series_list_path, lambda f: [
-            dict(zip(['file_name', 'folder_name', 'season_number', 'replace_url'], 
-                     (line.strip().split('|') + [''])[:4]))
+            self.parse_series_entry(line.strip())
             for line in f if '|' in line
         ])
 
+    def parse_series_entry(self, line):
+        parts = line.split('|')
+        entry = {
+            'file_name': parts[0],
+            'folder_name': parts[1],
+            'season_number': parts[2],
+            'replace_url': '',
+            'fix_timing': ''
+        }
+        
+        # Handle optional fields
+        if len(parts) > 3:
+            # Check if the 4th part is a URL or FixTiming
+            if parts[3].startswith(('http://', 'https://')):
+                entry['replace_url'] = parts[3]
+                if len(parts) > 4 and parts[4].upper() == 'FIXTIMING':
+                    entry['fix_timing'] = parts[4].upper()
+            elif parts[3].upper() == 'FIXTIMING':
+                entry['fix_timing'] = parts[3].upper()
+        
+        if not self.validate_series_entry(entry):
+            self.log(f"Warning: Invalid series entry - {line}")
+            return None
+            
+        return entry
+
     def log(self, message):
         self.log_content += f"{message}\n"
-        self.layout["log"].update(Panel(self.log_content.strip(), title="Log", border_style="yellow", expand=True))
+        # Keep only last 100 lines to prevent memory issues
+        lines = self.log_content.split('\n')
+        if len(lines) > 100:
+            self.log_content = '\n'.join(lines[-100:])
+        # Update panel with scrollable content
+        self.layout["log"].update(
+            Panel(
+                Text(self.log_content.strip(), no_wrap=True),
+                title="Log",
+                border_style="yellow",
+                expand=True
+            )
+        )
+        # Force refresh to show latest content
         self.live.refresh()
 
     def mkvmerge_log(self, message):
@@ -369,6 +410,134 @@ class MegumiDownload:
                     shutil.move(str(file), str(dest_file))
                     self.log(f"Moved file: {file.name} to {dest_file}")
 
+                    # Process timing fix if requested
+                    if matched_series.get('fix_timing', '').upper() == 'FIXTIMING':
+                        self.log(f"Processing timing fix for {dest_file.name}")
+                        try:
+                            # Call program.py to fix timing and capture output
+                            program_path = self.script_dir / 'FixTiming.py'
+                            try:
+                                # Create a panel to show program.py output
+                                self.layout["mkvmerge"].update(
+                                    Panel(
+                                        "Running timing fix...",
+                                        title="Program.py Output",
+                                        border_style="orange3"
+                                    )
+                                )
+                                self.live.refresh()
+
+                                # Run program.py with real-time output
+                                # When running as compiled executable, FixTiming is bundled
+                                # Directly import and call the function
+                                try:
+                                    from FixTiming import fix_timing
+                                    # Create a panel to show program.py output
+                                    self.layout["mkvmerge"].update(
+                                        Panel(
+                                            "Running timing fix...",
+                                            title="Program.py Output",
+                                            border_style="orange3"
+                                        )
+                                    )
+                                    self.live.refresh()
+
+                                    # Call the function directly
+                                    fix_timing(str(dest_file))
+                                    
+                                    self.layout["mkvmerge"].update(
+                                        Panel(
+                                            "Timing fix completed successfully!",
+                                            title="Program.py Output",
+                                            border_style="green"
+                                        )
+                                    )
+                                    self.live.refresh()
+                                except Exception as e:
+                                    # Create error log file
+                                    error_log_path = self.script_dir / "errorlog.txt"
+                                    with open(error_log_path, 'w', encoding='utf-8') as f:
+                                        f.write(f"Error fixing subtitle timing: {e}\n")
+                                    
+                                    self.log(f"Error fixing subtitle timing. Details saved to: {error_log_path}")
+                                    
+                                    # Show error in panel
+                                    self.layout["mkvmerge"].update(
+                                        Panel(
+                                            f"Error fixing subtitle timing:\n\n{str(e)}",
+                                            title="Program.py Output",
+                                            border_style="red"
+                                        )
+                                    )
+                                    self.live.refresh()
+                                    time.sleep(5)  # Show error for 5 seconds before continuing
+
+                                # Direct function call completed successfully
+                                self.layout["mkvmerge"].update(
+                                    Panel(
+                                        "Timing fix completed successfully!",
+                                        title="Program.py Output",
+                                        border_style="green"
+                                    )
+                                )
+                                self.live.refresh()
+                            except subprocess.CalledProcessError as e:
+                                # Create error log file
+                                error_log_path = self.script_dir / "errorlog.txt"
+                                with open(error_log_path, 'w', encoding='utf-8') as f:
+                                    f.write(f"Error fixing subtitle timing: {e}\n")
+                                    if hasattr(e, 'stdout') and e.stdout:
+                                        f.write("Standard Output:\n")
+                                        f.write(str(e.stdout) + "\n")
+                                    if hasattr(e, 'stderr') and e.stderr:
+                                        f.write("Standard Error:\n")
+                                        f.write(str(e.stderr) + "\n")
+                    
+                                self.log(f"Error fixing subtitle timing. Details saved to: {error_log_path}")
+                    
+                                # Show program.py output in orange3 panel
+                                self.layout["mkvmerge"].update(
+                                    Panel(
+                                        f"Error fixing subtitle timing:\n\n"
+                                        f"Command: {' '.join(e.cmd) if hasattr(e, 'cmd') else 'Unknown'}\n"
+                                        f"Return code: {e.returncode if hasattr(e, 'returncode') else 'Unknown'}\n"
+                                        f"Output: {str(e.stdout) if hasattr(e, 'stdout') and e.stdout else 'None'}\n"
+                                        f"Error: {str(e.stderr) if hasattr(e, 'stderr') and e.stderr else 'None'}",
+                                        title="Program.py Output",
+                                        border_style="orange3"
+                                    )
+                                )
+                                self.live.refresh()
+                                time.sleep(5)  # Show error for 5 seconds before continuing
+                        except subprocess.CalledProcessError as e:
+                            # Create error log file
+                            error_log_path = self.script_dir / "errorlog.txt"
+                            with open(error_log_path, 'w', encoding='utf-8') as f:
+                                f.write(f"Error fixing subtitle timing: {e}\n")
+                                if hasattr(e, 'stdout') and e.stdout:
+                                    f.write("Standard Output:\n")
+                                    f.write(str(e.stdout) + "\n")
+                                if hasattr(e, 'stderr') and e.stderr:
+                                    f.write("Standard Error:\n")
+                                    f.write(str(e.stderr) + "\n")
+                    
+                            self.log(f"Error fixing subtitle timing. Details saved to: {error_log_path}")
+                    
+                            # Show program.py output in orange3 panel
+                            self.layout["mkvmerge"].update(
+                                Panel(
+                                    f"Error fixing subtitle timing:\n\n"
+                                    f"Command: {' '.join(e.cmd) if hasattr(e, 'cmd') else 'Unknown'}\n"
+                                    f"Return code: {e.returncode if hasattr(e, 'returncode') else 'Unknown'}\n"
+                                    f"Output: {str(e.stdout) if hasattr(e, 'stdout') and e.stdout else 'None'}\n"
+                                    f"Error: {str(e.stderr) if hasattr(e, 'stderr') and e.stderr else 'None'}",
+                                    title="Program.py Output",
+                                    border_style="orange3"
+                                )
+                            )
+                            self.live.refresh()
+                            time.sleep(5)  # Show error for 5 seconds before continuing
+
                     if self.config.get('SAVEINFO', 'OFF').upper() == 'ON':
                         with open(dest_dir / "filelist.txt", "a") as info_file:
                             info_file.write(f"{file.name} ({new_name})\n")
@@ -395,7 +564,42 @@ class MegumiDownload:
         replace_file = dest_dir / "replace.txt"
         self.log(f"Processing subtitles for {file_path.name}")
 
+        # First extract subtitles for timing fix
         subtitle_path = file_path.with_suffix('.ass')
+        try:
+            self.log(f"Extracting subtitles for timing fix from {file_path.name}")
+            result = subprocess.run([self.mkvextract_path, str(file_path), 'tracks', f"2:{subtitle_path}"], 
+                                    check=True, capture_output=True, text=True)
+            self.mkvmerge_log("mkvextract output:")
+            self.mkvmerge_log(self.format_progress_output(result.stdout))
+        except subprocess.CalledProcessError as e:
+            self.log(f"Error extracting subtitles: {e}")
+            self.mkvmerge_log("mkvextract error output:")
+            self.mkvmerge_log(e.stdout)
+            self.mkvmerge_log(e.stderr)
+            return
+
+        # Check if we should fix timing for this series
+        matched_series = next((series for series in self.series_list if series['file_name'] in file_path.name), None)
+        if matched_series and matched_series.get('fix_timing', '').upper() == 'FIXTIMING':
+            self.log(f"Fixing subtitle timing for {file_path.name}")
+            try:
+                # Call program.py to fix timing
+                program_path = self.script_dir / 'FixTiming.py'
+                subprocess.run([
+                    sys.executable, str(program_path),
+                    str(file_path),
+                    str(subtitle_path)
+                ], check=True)
+                self.log(f"Successfully fixed timing for {file_path.name}")
+            except subprocess.CalledProcessError as e:
+                self.log(f"Error fixing subtitle timing: {e}")
+                self.mkvmerge_log("program.py error output:")
+                self.mkvmerge_log(e.stdout)
+                self.mkvmerge_log(e.stderr)
+                return
+
+        # Now proceed with the original subtitle processing
         try:
             self.log(f"Extracting subtitles from {file_path.name}")
             result = subprocess.run([self.mkvextract_path, str(file_path), 'tracks', f"2:{subtitle_path}"], 
@@ -461,6 +665,19 @@ class MegumiDownload:
             self.mkvmerge_log(e.stdout)
             self.mkvmerge_log(e.stderr)
 
+    def validate_series_entry(self, series):
+        """Validate a series entry from serieslist.megumi"""
+        required_fields = ['file_name', 'folder_name', 'season_number']
+        if not all(key in series for key in required_fields):
+            return False
+        if not all(series[key] for key in required_fields):  # Ensure required fields are not empty
+            return False
+        if 'replace_url' in series and series['replace_url'] and not series['replace_url'].startswith(('http://', 'https://')):
+            return False
+        if 'fix_timing' in series and series['fix_timing'].upper() not in ['', 'FIXTIMING']:
+            return False
+        return True
+
     def validate_replace_file(self, replace_file):
         try:
             with open(replace_file, 'r', encoding='utf-8') as f:
@@ -514,12 +731,12 @@ class MegumiDownload:
             ("P-p", "P-P"), ("Q-q", "Q-Q"), ("R-r", "R-R"), ("S-s", "S-S"), ("T-t", "T-T"),
             ("U-u", "U-U"), ("W-w", "W-W"), ("Y-y", "Y-Y"), ("Z-z", "Z-Z"),
             ("\\N", " \\N "), ("\\h", "\\h "), ("pigtails", "twintails"), ("Pigtails", "Twintails"),
-			("Pigtail", "Twintail"), ("P-Pigtails", "T-Twintails"), ("pigtail", "twintail"), ("pop idol", "idol"),
-			("Pop idol", "Idol"), ("P-Pop idol", "I-Idol"), ("Pop Idol", "Idol"), ("kohai", "kouhai"), ("Kohai", "Kouhai"),
+			("Pigtail", "Twintail"), ("P-Pigtails", "T-Twintails"), ("pigtail", "twintail"), ("pop idol", "idol"), ("rice ball", "onigiri"), ("rice balls", "onigiri"),
+			("Rice ball", "Onigiri"), ("P-Pop idol", "I-Idol"), ("Pop idol", "Idol"), ("Pop Idol", "Idol"), ("kohai", "kouhai"), ("Kohai", "Kouhai"),
 			("kohai", "kouhai"), ("Holy shit", "Wow"), ("holy shit", "wow"), ("C'mon", "Come on"), ("M-Meow", "N-Nyan"), ("Meow", "Nyan"),
-			("Little Sister", "Younger Sister"), ("Little sister", "Younger sister"), ("little sister", "younger sister"),
-			("Big Sister", "Older Sister"), ("Big sister", "Older sister"), ("big sister", "older sister"),
-			("Big Brother", "Older Brother"), ("Big brother", "Older brother"), ("big brother", "older brother"),
+			("Little Sister", "Younger Sister"), ("L-Little sister", "Y-Younger sister"), ("Little sister", "Younger sister"), ("little sister", "younger sister"),
+			("Big Sister", "Older Sister"), ("B-Big sister", "O-Older sister"), ("Big sister", "Older sister"), ("big sister", "older sister"),
+			("Big Brother", "Older Brother"), ("B-Big brother", "O-Older brother"), ("Big brother", "Older brother"), ("big brother", "older brother"),
 			("Pin-Up Girl", "Gravure Idol"), ("pin-up girl", "gravure idol"),("P-Pin-up girl", "G-Gravure idol"),
         ]
         for old, new in replacements:
